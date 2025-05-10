@@ -1,108 +1,149 @@
-// Location data
-const locationData = {
-  questionOne: [
-    { id: 'italy', name: 'Italy', x: 180, y: 210 },
-    { id: 'spain', name: 'Spain', x: 140, y: 220 },
-    { id: 'uk', name: 'United Kingdom', x: 155, y: 150 },
-    { id: 'australia', name: 'Australia', x: 250, y: 400 }
-  ],
-  questionTwo: [
-    { id: 'france', name: 'France', x: 160, y: 180 },
-    { id: 'germany', name: 'Germany', x: 180, y: 160 },
-    { id: 'egypt', name: 'Egypt', x: 220, y: 250 },
-    { id: 'japan', name: 'Japan', x: 260, y: 200 }
-  ]
-};
+// Get elements
+const initialPopup = document.getElementById('initial-popup');
+const popupButton = document.getElementById('popup-button');
+const introScreen = document.querySelector('.intro-screen');
+const quizScreen = document.querySelector('.quiz-screen');
+const videoScreen = document.querySelector('.video-screen');
+const startButton = document.getElementById('start-button');
+const questionText = document.getElementById('question-text');
+const mapInstructions = document.getElementById('map-instructions');
+const currentQuestionNum = document.getElementById('current-question');
+const totalQuestions = document.getElementById('total-questions');
+const progressFill = document.querySelector('.progress-fill');
+const europeMap = document.getElementById('europe-map');
+const feedbackOverlay = document.getElementById('feedback-overlay');
+const unmuteButton = document.getElementById('unmute-button');
+const promoVideo = document.getElementById('promo-video');
 
-// State management
-let currentStep = 1;
-let feedbackTimeout;
+// State
+let currentQuestion = 0;
+let totalQuestionsCount = quizData.length;
 
-// DOM Elements
-const questionOne = document.getElementById('question-one');
-const questionTwo = document.getElementById('question-two');
-const videoScreen = document.getElementById('video-screen');
-const pinsQ1 = document.getElementById('pins-q1');
-const pinsQ2 = document.getElementById('pins-q2');
-const feedbackQ1 = document.getElementById('feedback-q1');
-const feedbackQ2 = document.getElementById('feedback-q2');
-const video = document.getElementById('reward-video');
-const muteToggle = document.getElementById('mute-toggle');
+// Initialize the application
+function initApp() {
+    // Show initial popup
+    setTimeout(() => {
+        initialPopup.classList.add('active');
+    }, 500);
 
-// Initialize pins
-function createPin(location, container, questionNumber) {
-  const pin = document.createElement('div');
-  pin.className = 'pin';
-  pin.style.left = `${location.x}px`;
-  pin.style.top = `${location.y}px`;
-  
-  pin.innerHTML = `
-    <svg class="pin-icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-      <circle cx="12" cy="10" r="3"/>
-    </svg>
-    <span class="pin-label">${location.name}</span>
-  `;
+    // Set question count
+    totalQuestions.textContent = totalQuestionsCount;
 
-  pin.addEventListener('click', () => handleAnswer(location.id, questionNumber));
-  container.appendChild(pin);
+    // Create map pins
+    createMapPins(europeMap, handlePinClick);
+
+    // Event listeners
+    popupButton.addEventListener('click', closePopup);
+    startButton.addEventListener('click', startQuiz);
+    unmuteButton.addEventListener('click', toggleSound);
+
+    // Initialize unmute button state
+    const unmuteIcon = unmuteButton.querySelector('.unmute-icon');
+    unmuteIcon.classList.add('muted');
 }
 
-// Initialize both questions
-locationData.questionOne.forEach(location => createPin(location, pinsQ1, 1));
-locationData.questionTwo.forEach(location => createPin(location, pinsQ2, 2));
+// Close popup
+function closePopup() {
+    initialPopup.classList.remove('active');
+}
 
-// Handle answers
-function handleAnswer(country, questionNumber) {
-  const correctAnswer = questionNumber === 1 ? 'italy' : 'france';
-  const isCorrect = country.toLowerCase() === correctAnswer;
-  const feedback = questionNumber === 1 ? feedbackQ1 : feedbackQ2;
-  
-  clearTimeout(feedbackTimeout);
-  
-  feedback.className = `feedback-message ${isCorrect ? 'correct' : 'incorrect'}`;
-  feedback.innerHTML = isCorrect
-    ? '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><span>Correct! Well done!</span>'
-    : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg><span>Incorrect. Try again!</span>';
-  
-  feedback.classList.remove('hidden');
+// Start the quiz
+function startQuiz() {
+    introScreen.classList.remove('active');
+    quizScreen.classList.add('active');
+    loadQuestion(currentQuestion);
+}
 
-  if (isCorrect) {
-    feedbackTimeout = setTimeout(() => {
-      currentStep++;
-      updateScreen();
+// Load question
+function loadQuestion(index) {
+    const question = quizData[index];
+    questionText.textContent = question.question;
+    mapInstructions.textContent = question.mapInstructions;
+    currentQuestionNum.textContent = index + 1;
+    updateProgress();
+}
+
+// Update progress bar
+function updateProgress() {
+    const progress = ((currentQuestion + 1) / totalQuestionsCount) * 100;
+    progressFill.style.width = `${progress}%`;
+}
+
+// Handle pin click
+function handlePinClick(country) {
+    const correctAnswer = quizData[currentQuestion].correctAnswer;
+    const isCorrect = country === correctAnswer;
+
+    showFeedback(isCorrect);
+
+    // Wait before proceeding
+    setTimeout(() => {
+        hideFeedback();
+
+        if (isCorrect) {
+            if (currentQuestion < totalQuestionsCount - 1) {
+                currentQuestion++;
+                loadQuestion(currentQuestion);
+
+                // Show video after question 2
+                if (currentQuestion === 2) {
+                    showVideoScreen();
+                }
+            } else {
+                showVideoScreen();
+            }
+        }
     }, 1500);
-  } else {
-    feedbackTimeout = setTimeout(() => {
-      feedback.classList.add('hidden');
-    }, 2000);
-  }
 }
 
-// Screen management
-function updateScreen() {
-  switch(currentStep) {
-    case 1:
-      questionOne.classList.remove('hidden');
-      questionTwo.classList.add('hidden');
-      videoScreen.classList.add('hidden');
-      break;
-    case 2:
-      questionOne.classList.add('hidden');
-      questionTwo.classList.remove('hidden');
-      videoScreen.classList.add('hidden');
-      break;
-    case 3:
-      questionOne.classList.add('hidden');
-      questionTwo.classList.add('hidden');
-      videoScreen.classList.remove('hidden');
-      break;
-  }
+// Show feedback
+function showFeedback(isCorrect) {
+    feedbackOverlay.classList.add('active');
+
+    if (isCorrect) {
+        feedbackOverlay.classList.add('correct');
+        feedbackOverlay.classList.remove('incorrect');
+        feedbackOverlay.querySelector('.feedback-text').textContent = 'CORRECT!';
+    } else {
+        feedbackOverlay.classList.add('incorrect');
+        feedbackOverlay.classList.remove('correct');
+        feedbackOverlay.querySelector('.feedback-text').textContent = 'INCORRECT!';
+    }
 }
 
-// Video controls
-muteToggle.addEventListener('click', () => {
-  video.muted = !video.muted;
-  muteToggle.querySelector('.volume-x').classList.toggle('hidden');
-  muteToggle.querySelector('.volume-2').classList.toggle('hidden');
-});
+// Hide feedback
+function hideFeedback() {
+    feedbackOverlay.classList.remove('active');
+}
+
+// Show video screen
+function showVideoScreen() {
+    quizScreen.classList.remove('active');
+    videoScreen.classList.add('active');
+
+    // Set video source
+    promoVideo.src = '_materials/ulajh.mp4';
+    promoVideo.muted = true; // Start muted by default
+
+    // Start video with a slight delay
+    setTimeout(() => {
+        promoVideo.play().catch(error => {
+            console.log("Video play failed:", error);
+        });
+    }, 500);
+}
+
+// Toggle sound
+function toggleSound() {
+    promoVideo.muted = !promoVideo.muted;
+    const unmuteIcon = unmuteButton.querySelector('.unmute-icon');
+
+    if (promoVideo.muted) {
+        unmuteIcon.classList.add('muted');
+    } else {
+        unmuteIcon.classList.remove('muted');
+    }
+}
+
+// Initialize the app when the DOM is ready
+document.addEventListener('DOMContentLoaded', initApp);
